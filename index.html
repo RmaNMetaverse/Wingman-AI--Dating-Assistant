@@ -177,7 +177,7 @@
                         <i className="fa-solid fa-images text-gray-500 group-hover:text-indigo-400 text-xl mb-2"></i>
                         <p className="text-xs text-gray-400 group-hover:text-gray-300">
                             Click to upload screenshots <br/> 
-                            <span className="text-[10px] text-gray-600">(Max 5)</span>
+                            <span className="text-[10px] text-gray-600">(Max 5) or <span className="text-indigo-400 font-bold">Ctrl+V</span> to paste</span>
                         </p>
                         <input 
                             type="file" 
@@ -245,6 +245,45 @@
         };
 
         // --- Image Handling ---
+
+        // Handle Paste Events (Ctrl+V)
+        useEffect(() => {
+            const handlePaste = (e) => {
+                // Only handle paste if we are in opener or reply tab
+                if (activeTab !== 'opener' && activeTab !== 'reply') return;
+
+                const items = e.clipboardData.items;
+                let foundImage = false;
+
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        foundImage = true;
+                        const file = items[i].getAsFile();
+                        const reader = new FileReader();
+                        
+                        reader.onloadend = () => {
+                            const setter = activeTab === 'opener' ? setOpenerImages : setReplyImages;
+                            setter(prev => {
+                                if (prev.length >= 5) return prev; // Respect limit
+                                return [...prev, {
+                                    data: reader.result,
+                                    mime: file.type
+                                }];
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+
+                // If we found an image, prevent it from pasting into text fields if any are focused
+                if (foundImage) {
+                    e.preventDefault();
+                }
+            };
+
+            window.addEventListener('paste', handlePaste);
+            return () => window.removeEventListener('paste', handlePaste);
+        }, [activeTab]);
 
         const handleImageUpload = (e, setImages, currentImages) => {
             const files = Array.from(e.target.files);
