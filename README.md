@@ -19,9 +19,8 @@ This is a **Single File Application**. You do not need Node.js, NPM, or a backen
 
 ### **Option 1: Run Locally (Windows/Mac/Linux)**
 
-1. Download the dating\_assistant.html file from this repository.  
-2. Rename it to index.html (optional).  
-3. Double-click the file to open it in your web browser (Chrome, Edge, Firefox).
+1. Download/Clone the repo.    
+2. Double-click index.html file to open it in your web browser (Chrome, Edge, Firefox).
 
 ### **Option 2: Host for Free (GitHub Pages)**
 
