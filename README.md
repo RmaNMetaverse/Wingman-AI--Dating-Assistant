@@ -23,7 +23,7 @@ This is a **Single File Application**. You do not need Node.js, NPM, or a backen
 2. Rename it to index.html (optional).  
 3. Double-click the file to open it in your web browser (Chrome, Edge, Firefox).
 
-### **Option 2: Host for Free (Netlify/GitHub Pages)**
+### **Option 2: Host for Free (GitHub Pages)**
 
 **GitHub Pages:** \[Wingman AI \- Dating Assistant\](https://aistudio.google.com/app/apikey)
 
