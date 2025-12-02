@@ -136,6 +136,15 @@
             background-color: #1e1b4b;
             color: #e0e7ff;
         }
+
+
+        #logo-icon{
+            font-size: 2.2rem;
+            position: relative;
+            bottom: 15%;
+        }
+
+
     </style>
 </head>
 <body>
@@ -661,18 +670,8 @@
                     {/* Header */}
                     <header className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
-                            <img 
-                                src="icon-192.png" 
-                                alt="Logo" 
-                                className="w-9 h-9 rounded-xl shadow-lg shadow-black/20 object-cover" 
-                                onError={(e) => {
-                                    e.target.onerror = null; 
-                                    e.target.style.display = 'none'; 
-                                    e.target.nextSibling.style.display = 'flex';
-                                }}
-                            />
-                            <div className="hidden w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 items-center justify-center shadow-lg">
-                                <i className="fa-solid fa-wind text-white text-sm"></i>
+                            <div className="w-9 h-9 rounded-xl from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shrink-0" role="img" aria-label="logo">
+                                <span className="text-white text-sm" id="logo-icon">💘</span>
                             </div>
                             <div>
                                 <h1 className="text-lg font-bold tracking-tight text-white leading-none">Wingman</h1>
