@@ -160,21 +160,26 @@
         </button>
     );
 
-    const SuggestionCard = ({ title, text, onCopy }) => (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-4 backdrop-blur-md shadow-lg transition-transform hover:scale-[1.01]">
-            <div className="flex justify-between items-start mb-3">
-                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest px-2 py-1 bg-indigo-500/20 rounded-full border border-indigo-500/20">{title}</span>
-                <button 
-                    onClick={() => onCopy(text)}
-                    className="text-white/40 hover:text-white transition-colors p-1"
-                    title="Copy to clipboard"
-                >
-                    <i className="fa-regular fa-copy"></i>
-                </button>
+    const SuggestionCard = ({ title, text, onCopy }) => {
+        // Each SuggestionCard represents a single message option.
+        // Render the whole text in one card and provide one copy button for the full message.
+        return (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-4 backdrop-blur-md shadow-lg transition-transform hover:scale-[1.01]">
+                <div className="flex justify-between items-start mb-3">
+                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest px-2 py-1 bg-indigo-500/20 rounded-full border border-indigo-500/20">{title}</span>
+                    <button
+                        onClick={() => onCopy(text)}
+                        className="text-white/40 hover:text-white transition-colors p-1"
+                        title="Copy to clipboard"
+                    >
+                        <i className="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+
+                <p className="text-gray-100 text-sm leading-relaxed whitespace-pre-wrap font-medium">{text}</p>
             </div>
-            <p className="text-gray-100 text-sm leading-relaxed whitespace-pre-wrap font-medium">{text}</p>
-        </div>
-    );
+        );
+    };
 
     const LanguageCheckbox = ({ lang, selected, toggle }) => (
         <div 
@@ -280,16 +285,20 @@
         const [loading, setLoading] = useState(false);
         const [error, setError] = useState('');
         const [suggestions, setSuggestions] = useState([]);
-        const [vibeAnalysis, setVibeAnalysis] = useState('');
-        const [selectedLangs, setSelectedLangs] = useState(['English']);
+    const [vibeAnalysis, setVibeAnalysis] = useState('');
+    // Intro texts (planning/analysis) extracted from model output; shown as plain text (no copy)
+    const [introTexts, setIntroTexts] = useState([]);
+    const [selectedLangs, setSelectedLangs] = useState(['English']);
         const AVAILABLE_LANGS = ['English', 'Spanish', 'Farsi', 'French', 'German', 'Portuguese', 'Italian', 'Russian', 'Japanese', 'Chinese'];
         const [herBio, setHerBio] = useState('');
         const [herInterests, setHerInterests] = useState('');
         const [openerImages, setOpenerImages] = useState([]);
         const [chatHistory, setChatHistory] = useState('');
         const [replyImages, setReplyImages] = useState([]);
-        const [myVibe, setMyVibe] = useState('Funny & Witty');
-        const [showKeyHint, setShowKeyHint] = useState(false);
+    const [myVibe, setMyVibe] = useState('Funny & Witty');
+    const [showKeyHint, setShowKeyHint] = useState(false);
+    // Ref to the results area so we can scroll to it after results arrive
+    const resultsRef = useRef(null);
 
         useEffect(() => {
             const storedKey = localStorage.getItem('gemini_api_key');
@@ -303,15 +312,13 @@
             localStorage.setItem('gemini_api_key', key);
         };
 
+        // Only allow selecting a single language. Clicking any language will select it exclusively.
         const toggleLanguage = (lang) => {
-            let newLangs;
-            if (selectedLangs.includes(lang)) {
-                if (selectedLangs.length === 1) return; 
-                newLangs = selectedLangs.filter(l => l !== lang);
-            } else {
-                if (selectedLangs.length >= 3) return; 
-                newLangs = [...selectedLangs, lang];
+            if (selectedLangs[0] === lang) {
+                // already selected — keep it (do not allow deselecting to empty)
+                return;
             }
+            const newLangs = [lang];
             setSelectedLangs(newLangs);
             localStorage.setItem('wingman_langs', JSON.stringify(newLangs));
         };
@@ -362,8 +369,60 @@
         };
 
         const copyToClipboard = (text) => {
-            navigator.clipboard.writeText(text);
+            if (!text) return;
+
+            // Helper to clean a single line by removing:
+            // - Leading bullets or markers (*, -, •)
+            // - Leading numbering (e.g. "3.", "2)")
+            // - Leading labeled prefixes (option titles) possibly wrapped in markdown bold, e.g. "**Playful**:", "**جسور:**"
+            const cleanLine = (line) => {
+                if (!line) return line;
+                // Remove common bullet markers
+                line = line.replace(/^\s*[\*\-\u2022]\s*/, '');
+                // Remove leading numbering like "3.", "1)", "2 -"
+                line = line.replace(/^\s*\d+\s*[\.\)\-–—]*\s*/, '');
+                // Remove leading markdown bold/underline markers like '**', '__', '*' or '_' if left alone
+                line = line.replace(/^\s*(?:\*{1,2}|_{1,2})\s*/, '');
+                // Remove leading labeled prefixes (with optional bold markup) followed by colon/dash/parenthesis
+                // Examples matched: "**Playful**:", "Playful:", "3. **جسور:**"
+                line = line.replace(/^(?:\*{1,2}\s*)?[^:\n]{1,60}?(?:\s*\*{1,2})?\s*[:\-–—)\]]\s*/u, '');
+                // If there are still leftover leading markdown markers like '** ' remove them
+                line = line.replace(/^\s*(?:\*{1,2}|_{1,2})\s*/, '');
+                // Remove any leftover leading punctuation sequences often left by formatting/labels (e.g. ":**", ":-", "**:")
+                line = line.replace(/^[\s\:\*\_\-»«\u200F\u200E]+/, '');
+                return line;
+            };
+
+            const cleaned = text.split(/\r?\n/).map(cleanLine).join('\n').trim();
+
+            try {
+                navigator.clipboard.writeText(cleaned);
+            } catch (e) {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = cleaned;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
         };
+
+        // Auto-scroll to results when they appear (suggestions, vibeAnalysis, or introTexts)
+        useEffect(() => {
+            if ((suggestions && suggestions.length) || vibeAnalysis || (introTexts && introTexts.length)) {
+                if (resultsRef && resultsRef.current) {
+                    // small timeout to allow rendering/layout
+                    setTimeout(() => {
+                        try {
+                            resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        } catch (e) {
+                            resultsRef.current.scrollIntoView();
+                        }
+                    }, 80);
+                }
+            }
+        }, [suggestions, vibeAnalysis, introTexts]);
 
         const generateContent = async () => {
             if (!apiKey) {
@@ -375,8 +434,18 @@
             setError('');
             setSuggestions([]);
             setVibeAnalysis('');
+            setIntroTexts([]);
 
-            const langInstruction = `Output languages: ${selectedLangs.join(', ')}. If multiple, provide English first then translations.`;
+            // Build a clear language instruction for the model.
+            // If only one language is selected, ask the model to ONLY output that language.
+            // If multiple languages are selected, ask for clearly labeled sections (e.g. "Farsi:")
+            // and only include languages from the selected list. Put English first only when included.
+            let langInstruction = '';
+            if (selectedLangs.length === 1) {
+                langInstruction = `Output language: ${selectedLangs[0]}. ONLY output this language and do NOT include English unless it is the selected language.`;
+            } else {
+                langInstruction = `Output languages: ${selectedLangs.join(', ')}. For each language, clearly label the section with the language name on its own line (for example: "Farsi:") followed by the messages. Do NOT include any languages outside this list. If English is included, put English first.`;
+            }
             let systemInstruction = "";
             let userPromptText = "";
             let imagesToSend = [];
@@ -442,7 +511,7 @@
                 }
 
                 let rawText = candidate.content.parts[0].text;
-                if (rawText.includes("VIBE CHECK")) {
+                if (rawText && rawText.includes("VIBE CHECK")) {
                     const parts = rawText.split(/VIBE CHECK:?/i);
                     if (parts.length > 1) {
                          const analysisEnd = parts[1].search(/(Option 1|1\.|Here are)/i);
@@ -454,7 +523,130 @@
                          }
                     }
                 }
-                setSuggestions([{ title: "Response Options", text: rawText }]);
+                // Parse the rawText into language-specific messages and produce a flat list
+                // of suggestion entries so each language/message has its own copy button.
+                const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                const parseSections = (text, langs) => {
+                    if (!text) return [];
+                    const sections = [];
+                    const splitNumberedList = (t) => {
+                        // Match numbered items like "1. text" or "1) text" across the text and return array of texts
+                        const itemRegex = /(^|\n)\s*(?:\d+|(?:Option\s*\d+))\s*[\.)\-:]\s*/gim;
+                        // If there is no numbered pattern, return null
+                        if (!itemRegex.test(t)) return null;
+                        // Reconstruct by scanning lines for markers instead
+                        const results = [];
+                        let current = null;
+                        const lines = t.split(/\r?\n/);
+                        for (let line of lines) {
+                            if (/^\s*(?:\d+|Option\s*\d+)\s*[\.)\-:]\s*/i.test(line)) {
+                                if (current) results.push(current.trim());
+                                current = line.replace(/^\s*(?:\d+|Option\s*\d+)\s*[\.)\-:]\s*/i, '');
+                            } else {
+                                if (current === null) current = line; else current += ' ' + line;
+                            }
+                        }
+                        if (current) results.push(current.trim());
+                        return results.filter(Boolean);
+                    };
+
+                    // Attempt to find explicit language headings (one-per-line) like "Farsi:" or "Farsi".
+                    const headingRegex = new RegExp(`^\\s*(?:${langs.map(l => escapeRegex(l)).join('|')})\\s*[:\-–—]*\\s*$`, 'gim');
+                    const matches = [];
+                    let m;
+                    while ((m = headingRegex.exec(text)) !== null) {
+                        matches.push({ index: m.index, match: m[0].trim(), lang: m[0].trim().replace(/[:\-–—]+$/, '').trim() });
+                    }
+
+                    if (matches.length > 0) {
+                        // Build sections between headings
+                        for (let i = 0; i < matches.length; i++) {
+                            const start = matches[i].index + matches[i].match.length;
+                            const end = i + 1 < matches.length ? matches[i+1].index : text.length;
+                            const body = text.substring(start, end).trim();
+                            // Prefer numbered list splitting when present
+                            const numbered = splitNumberedList(body);
+                            const msgs = (numbered && numbered.length) ? numbered : body.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+                            sections.push({ lang: matches[i].lang.replace(/[:\-–—]+$/, '').trim(), messages: msgs });
+                        }
+                        return sections;
+                    }
+
+                    // If no clear headings, try to find inline labels like "Farsi:" anywhere
+                    const inlineSections = [];
+                    for (const lang of langs) {
+                        const re = new RegExp(`${escapeRegex(lang)}\\s*[:\-–—]+\\s*`, 'i');
+                        const res = text.split(re);
+                        if (res.length > 1) {
+                            // res[0] is before first label; the subsequent parts are candidates
+                            // We'll join everything after the first label and split by double-newline
+                            const after = res.slice(1).join('');
+                            const numbered = splitNumberedList(after);
+                            const msgs = (numbered && numbered.length) ? numbered : after.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+                            inlineSections.push({ lang, messages: msgs });
+                        }
+                    }
+                    if (inlineSections.length > 0) return inlineSections;
+
+                    // Fallbacks:
+                    // - If only one language selected, assign whole text to that language split by blank lines.
+                    if (langs.length === 1) {
+                        const numbered = splitNumberedList(text);
+                        const msgs = (numbered && numbered.length) ? numbered : text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+                        return [{ lang: langs[0], messages: msgs }];
+                    }
+
+                    // - If multiple languages but no labels found, split text into chunks by blank lines
+                    //   and distribute them round-robin across the selected languages.
+                    const numbered = splitNumberedList(text);
+                    const chunks = (numbered && numbered.length) ? numbered : text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+                    const distributed = langs.map(l => ({ lang: l, messages: [] }));
+                    for (let i = 0; i < chunks.length; i++) {
+                        distributed[i % distributed.length].messages.push(chunks[i]);
+                    }
+                    return distributed;
+                };
+
+                const parsed = parseSections(rawText, selectedLangs);
+                const suggestionsList = [];
+                const intros = [];
+
+                const isLikelyIntro = (text) => {
+                    if (!text) return false;
+                    const t = text.trim();
+                    const lower = t.toLowerCase();
+                    // Require both a planning keyword and a moderate length to be considered intro
+                    const introKeywords = ['plan', 'analysis', 'vibe check', 'vibe', 'approach', 'steps', 'summary', 'background', 'context', 'strategy', 'here are', "here's", 'analysis:'];
+                    const hasKeyword = introKeywords.some(k => lower.includes(k));
+                    if (hasKeyword && lower.length > 60) return true;
+                    // Very long blocks are probably intro
+                    if (lower.length > 400) return true;
+                    return false;
+                };
+
+                if (parsed.length === 0) {
+                    // final fallback: show rawText as one response with a generic title
+                    if (isLikelyIntro(rawText)) {
+                        intros.push({ lang: selectedLangs[0] || 'Text', text: rawText });
+                    } else {
+                        suggestionsList.push({ title: 'Response', text: rawText });
+                    }
+                } else {
+                    parsed.forEach(section => {
+                        const msgs = section.messages && section.messages.length ? [...section.messages] : [rawText];
+                        // If the first message looks like planning/analysis, treat as intro (no copy)
+                        if (msgs.length > 0 && isLikelyIntro(msgs[0])) {
+                            intros.push({ lang: section.lang, text: msgs.shift() });
+                        }
+                        msgs.forEach((m, i) => {
+                            suggestionsList.push({ title: `${section.lang} • Option ${i+1}`, text: m });
+                        });
+                    });
+                }
+
+                setIntroTexts(intros);
+                setSuggestions(suggestionsList);
             } catch (err) {
                 setError(err.message);
             } finally {
@@ -620,7 +812,7 @@
                         )}
 
                         {(activeTab !== 'settings') && (vibeAnalysis || suggestions.length > 0) && (
-                            <div className="mt-8 pt-6 pb-20 animate-slide-up">
+                            <div ref={resultsRef} className="mt-8 pt-6 pb-20 animate-slide-up">
                                 {vibeAnalysis && (
                                     <div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-white/10 rounded-2xl p-4 mb-5 backdrop-blur-md">
                                         <h4 className="text-indigo-300 text-[10px] font-bold uppercase tracking-widest mb-1.5 flex items-center gap-2">
@@ -630,12 +822,12 @@
                                     </div>
                                 )}
 
-                                <h3 className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-3 pl-1">
-                                    Suggestions
-                                </h3>
-                                {suggestions.map((s, i) => (
-                                    <SuggestionCard key={i} title={s.title} text={s.text} onCopy={copyToClipboard} />
-                                ))}
+                                        <h3 className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-3 pl-1">
+                                            Suggestions
+                                        </h3>
+                                        {suggestions.map((s, i) => (
+                                            <SuggestionCard key={i} title={s.title} text={s.text} onCopy={copyToClipboard} />
+                                        ))}
                             </div>
                         )}
                         
